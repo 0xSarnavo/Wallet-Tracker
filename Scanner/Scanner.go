@@ -1,11 +1,10 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"database/sql"
 	"log"
-	"net/http"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // Define structures to parse the response
@@ -33,6 +32,45 @@ type APIResponse struct {
 }
 
 func main() {
+
+	db, err := sql.Open("sqlite3", "./network_contracts.db")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
+
+    err = db.Ping()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    networkNames, err := fetchNetworkName(db)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+	networkApis, err := fetchNetworkApi(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	networkEnvs, err := fetchNetworkEnv(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+    for _, table := range networkNames {
+        log.Printf("Network Name: %s", table)
+    }
+
+	for _, table := range networkApis {
+        log.Printf("Network APIs: %s", table)
+    }
+
+	for _, table := range networkEnvs {
+        log.Printf("Network APIs: %s", table)
+    }
+/**
 	// Prompt for API key, address, and the base URL
 	var apiKey, address, baseURL string
 
@@ -91,4 +129,62 @@ func main() {
 	} else {
 		fmt.Println("Error in response:", apiResp.Message)
 	}
+		**/
+}
+
+func fetchNetworkName(db *sql.DB) ([]string, error) {
+    rows, err := db.Query("SELECT name FROM networks")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var network []string
+    for rows.Next() {
+        var networkName string
+        if err := rows.Scan(&networkName); err != nil {
+            return nil, err
+        }
+        network = append(network, networkName)
+    }
+
+    return network, rows.Err()
+}
+
+func fetchNetworkApi(db *sql.DB) ([]string, error) {
+    rows, err := db.Query("SELECT api_link FROM networks")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var api_links []string
+    for rows.Next() {
+        var api string
+        if err := rows.Scan(&api); err != nil {
+            return nil, err
+        }
+        api_links = append(api_links, api)
+    }
+
+    return api_links, rows.Err()
+}
+
+func fetchNetworkEnv(db *sql.DB) ([]string, error) {
+    rows, err := db.Query("SELECT apikey_env FROM networks")
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var env_names []string
+    for rows.Next() {
+        var env string
+        if err := rows.Scan(&env); err != nil {
+            return nil, err
+        }
+        env_names = append(env_names, env)
+    }
+
+    return env_names, rows.Err()
 }
