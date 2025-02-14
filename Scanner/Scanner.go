@@ -64,6 +64,34 @@ type InternalTxAPIResponse struct {
 	Result  []InternalTxResult `json:"result"`
 }
 
+type Erc20TxResult struct {
+	BlockNumber       string `json:"blockNumber"`
+	TimeStamp         string `json:"timeStamp"`
+	Hash              string `json:"hash"`
+	Nonce             string `json:"nonce"`
+	BlockHash         string `json:"blockHash"`
+	From              string `json:"from"`
+	ContractAddress   string `json:"contractAddress"`
+	To                string `json:"to"`
+	Value             string `json:"value"`
+	TokenName         string `json:"tokenName"`
+	TokenSymbol       string `json:"tokenSymbol"`
+	TokenDecimal      string `json:"tokenDecimal"`
+	TransactionIndex  string `json:"transactionIndex"`
+	Input             string `json:"input"`
+	Gas               string `json:"gas"`
+	GasPrice          string `json:"gasPrice"`
+	GasUsed           string `json:"gasUsed"`
+	CumulativeGasUsed string `json:"cumulativeGasUsed"`
+	Confirmations     string `json:"confirmations"`
+}
+
+type Erc20TxAPIResponse struct {
+	Status  string        `json:"status"`
+	Message string        `json:"message"`
+	Result  []Erc20TxResult `json:"result"`
+}
+
 func main() {
 	// Load environment variables
 	err := godotenv.Load(".env")
@@ -184,6 +212,37 @@ func fetchTransactions(network, baseURL, apiKey, address string) {
 		}
 	} else {
 		log.Printf("API Error for %s: %s\n", network, internalApiResp.Message)
+	}
+
+	//erc20 transactions
+	erc20TxUrl := fmt.Sprintf("%s?module=account&action=tokentx&address=%s&startblock=0&endblock=99999999&page=1&offset=10&sort=asc&apikey=%s", baseURL, address, apiKey)
+
+	erc20Resp, err := http.Get(erc20TxUrl)
+	if err != nil {
+		log.Printf("Error calling API for %s: %v\n", network, err)
+		return
+	}
+	defer erc20Resp.Body.Close()
+
+	erc20Body, err := ioutil.ReadAll(erc20Resp.Body)
+	if err != nil {
+		log.Printf("Error reading response for %s: %v\n", network, err)
+		return
+	}
+
+	var erc20ApiResp Erc20TxAPIResponse
+	if err = json.Unmarshal(erc20Body, &erc20ApiResp); err != nil {
+		log.Printf("Error unmarshaling response for %s: %v\n", network, err)
+		return
+	}
+
+	if erc20ApiResp.Status == "1" {
+		log.Printf("\nTransactions for %s:\n", network)
+		for _, tx := range erc20ApiResp.Result {
+			log.Printf("Block: %s, From: %s, To: %s, Value: %s, Hash: %s\n", tx.BlockNumber, tx.From, tx.To, tx.Value, tx.Hash)
+		}
+	} else {
+		log.Printf("API Error for %s: %s\n", network, erc20ApiResp.Message)
 	}
 }
 
