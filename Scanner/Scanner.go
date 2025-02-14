@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -8,12 +9,39 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type Result struct {
+type NormalTxResult struct {
+	BlockNumber       string `json:"blockNumber"`
+	TimeStamp         string `json:"timeStamp"`
+	Hash              string `json:"hash"`
+	Nonce             string `json:"nonce"`
+	BlockHash         string `json:"blockHash"`
+	TransactionIndex  string `json:"transactionIndex"`
+	From              string `json:"from"`
+	To                string `json:"to"`
+	Value             string `json:"value"`
+	Gas               string `json:"gas"`
+	GasPrice          string `json:"gasPrice"`
+	IsError           string `json:"isError"`
+	TxReceiptStatus   string `json:"txreceipt_status"`
+	Input             string `json:"input"`
+	ContractAddress   string `json:"contractAddress"`
+	CumulativeGasUsed string `json:"cumulativeGasUsed"`
+	GasUsed           string `json:"gasUsed"`
+	Confirmations     string `json:"confirmations"`
+}
+
+type NormalTxAPIResponse struct {
+	Status  string        `json:"status"`
+	Message string        `json:"message"`
+	Result  []NormalTxResult `json:"result"`
+}
+type InternalTxResult struct {
 	BlockNumber  string `json:"blockNumber"`
 	TimeStamp    string `json:"timeStamp"`
 	Hash         string `json:"hash"`
@@ -30,10 +58,10 @@ type Result struct {
 	ErrCode      string `json:"errCode"`
 }
 
-type APIResponse struct {
+type InternalTxAPIResponse struct {
 	Status  string   `json:"status"`
 	Message string   `json:"message"`
-	Result  []Result `json:"result"`
+	Result  []InternalTxResult `json:"result"`
 }
 
 func main() {
@@ -71,7 +99,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Iterate through networks and fetch transactions
+	fmt.Print("Enter Ethereum address: ")
+	reader := bufio.NewReader(os.Stdin)
+	userAddress, _ := reader.ReadString('\n')
+	userAddress = strings.TrimSpace(userAddress)
+
 	for i, network := range networkNames {
 		apiKey := os.Getenv(networkEnvs[i])
 		if apiKey == "" {
@@ -79,40 +111,79 @@ func main() {
 			continue
 		}
 
-		fetchTransactions(network, networkApis[i], apiKey)
+		fetchTransactions(network, networkApis[i], apiKey, userAddress)
 	}
 }
 
-// Fetch transactions from API
-func fetchTransactions(network, baseURL, apiKey string) {
-	url := fmt.Sprintf("%s?module=account&action=txlistinternal&startblock=13028500&endblock=13028600&page=1&offset=10&sort=asc&apikey=%s", baseURL, apiKey)
 
-	resp, err := http.Get(url)
+// Fetch transactions from API
+func fetchTransactions(network, baseURL, apiKey, address string) {
+	
+	if address == "" {
+		log.Println("No address provided. Skipping API call.")
+		return
+	}
+
+	// normal transactions
+	normalTxUrl := fmt.Sprintf("%s?module=account&action=txlist&address=%s&startblock=0&endblock=99999999&page=1&offset=10&sort=asc&apikey=%s", baseURL, address, apiKey)
+
+	normalResp, err := http.Get(normalTxUrl)
 	if err != nil {
 		log.Printf("Error calling API for %s: %v\n", network, err)
 		return
 	}
-	defer resp.Body.Close()
+	defer normalResp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	normalBody, err := ioutil.ReadAll(normalResp.Body)
 	if err != nil {
 		log.Printf("Error reading response for %s: %v\n", network, err)
 		return
 	}
 
-	var apiResp APIResponse
-	if err = json.Unmarshal(body, &apiResp); err != nil {
+	var normalApiResp NormalTxAPIResponse
+	if err = json.Unmarshal(normalBody, &normalApiResp); err != nil {
 		log.Printf("Error unmarshaling response for %s: %v\n", network, err)
 		return
 	}
 
-	if apiResp.Status == "1" {
+	if normalApiResp.Status == "1" {
 		log.Printf("\nTransactions for %s:\n", network)
-		for _, tx := range apiResp.Result {
+		for _, tx := range normalApiResp.Result {
 			log.Printf("Block: %s, From: %s, To: %s, Value: %s, Hash: %s\n", tx.BlockNumber, tx.From, tx.To, tx.Value, tx.Hash)
 		}
 	} else {
-		log.Printf("API Error for %s: %s\n", network, apiResp.Message)
+		log.Printf("API Error for %s: %s\n", network, normalApiResp.Message)
+	}
+
+	//internal transactions
+	internalTxUrl := fmt.Sprintf("%s?module=account&action=txlistinternal&startblock=0&endblock=99999999&page=1&offset=10&sort=asc&apikey=%s", baseURL, apiKey)
+
+	internalResp, err := http.Get(internalTxUrl)
+	if err != nil {
+		log.Printf("Error calling API for %s: %v\n", network, err)
+		return
+	}
+	defer internalResp.Body.Close()
+
+	internalBody, err := ioutil.ReadAll(internalResp.Body)
+	if err != nil {
+		log.Printf("Error reading response for %s: %v\n", network, err)
+		return
+	}
+
+	var internalApiResp InternalTxAPIResponse
+	if err = json.Unmarshal(internalBody, &internalApiResp); err != nil {
+		log.Printf("Error unmarshaling response for %s: %v\n", network, err)
+		return
+	}
+
+	if internalApiResp.Status == "1" {
+		log.Printf("\nTransactions for %s:\n", network)
+		for _, tx := range internalApiResp.Result {
+			log.Printf("Block: %s, From: %s, To: %s, Value: %s, Hash: %s\n", tx.BlockNumber, tx.From, tx.To, tx.Value, tx.Hash)
+		}
+	} else {
+		log.Printf("API Error for %s: %s\n", network, internalApiResp.Message)
 	}
 }
 
