@@ -1,7 +1,6 @@
-package main
+package scanner
 
 import (
-	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
@@ -92,7 +90,7 @@ type Erc20TxAPIResponse struct {
 	Result  []Erc20TxResult `json:"result"`
 }
 
-func main() {
+func Scan(address string) {
 	// Load environment variables
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -127,11 +125,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Print("Enter Ethereum address: ")
-	reader := bufio.NewReader(os.Stdin)
-	userAddress, _ := reader.ReadString('\n')
-	userAddress = strings.TrimSpace(userAddress)
-
 	for i, network := range networkNames {
 		apiKey := os.Getenv(networkEnvs[i])
 		if apiKey == "" {
@@ -139,7 +132,7 @@ func main() {
 			continue
 		}
 
-		fetchTransactions(network, networkApis[i], apiKey, userAddress)
+		fetchTransactions(network, networkApis[i], apiKey, address)
 	}
 }
 

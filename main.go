@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -9,12 +10,13 @@ import (
 	"strings"
 
 	dbmanager "wallet-tracker/Database"
+	scanner "wallet-tracker/Scanner"
 )
 
 func main() {
 	db, err := dbmanager.InitDB()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
 
@@ -22,13 +24,44 @@ func main() {
 
 	for {
 		fmt.Println("\nChoose an option:")
+		fmt.Println("1. Manage Database")
+		fmt.Println("2. Fetch Wallet Transaction Details")
+		fmt.Println("3. Exit")
+		fmt.Print("Enter your choice: ")
+
+		choiceStr, _ := reader.ReadString('\n')
+		choiceStr = strings.TrimSpace(choiceStr)
+		choice, err := strconv.Atoi(choiceStr)
+		if err != nil {
+			fmt.Println("Invalid choice. Please enter a number.")
+			continue
+		}
+
+		switch choice {
+		case 1:
+			manageDatabase(db, reader)
+		case 2:
+			fetchWalletTransactions(reader)
+		case 3:
+			fmt.Println("Exiting...")
+			return
+		default:
+			fmt.Println("Invalid choice, please try again.")
+		}
+	}
+}
+
+// Function to handle database management options
+func manageDatabase(db *sql.DB, reader *bufio.Reader) {
+	for {
+		fmt.Println("\nDatabase Management:")
 		fmt.Println("1. List Networks")
 		fmt.Println("2. Add Network")
 		fmt.Println("3. Remove Network")
 		fmt.Println("4. List Contracts by Network")
 		fmt.Println("5. Add Contract")
 		fmt.Println("6. Remove Contract")
-		fmt.Println("7. Exit")
+		fmt.Println("7. Back to Main Menu")
 		fmt.Print("Enter your choice: ")
 
 		choiceStr, _ := reader.ReadString('\n')
@@ -43,7 +76,6 @@ func main() {
 		case 1:
 			fmt.Println("\nNetworks in the database:")
 			dbmanager.ListNetworks(db)
-
 		case 2:
 			fmt.Print("\nEnter network name: ")
 			name, _ := reader.ReadString('\n')
@@ -104,11 +136,24 @@ func main() {
 			dbmanager.RemoveContract(db, contractAddress)
 
 		case 7:
-			fmt.Println("Exiting...")
+			fmt.Println("Returning to main menu...")
 			return
-
 		default:
 			fmt.Println("Invalid choice, please try again.")
 		}
 	}
+}
+
+// Function to fetch wallet transaction details
+func fetchWalletTransactions(reader *bufio.Reader) {
+	fmt.Print("\nEnter Ethereum address: ")
+	address, _ := reader.ReadString('\n')
+	address = strings.TrimSpace(address)
+
+	if address == "" {
+		fmt.Println("Error: No address provided.")
+		return
+	}
+
+	scanner.Scan(address) 
 }
